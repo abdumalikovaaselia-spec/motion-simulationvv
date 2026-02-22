@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Механикалық қозғалыс симуляциясы</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:ital,wght@0,300;0,400;0,600;1,400&display=swap');
+
+  :root {
+    --bg: #05080f;
+    --panel: #0a1020;
+    --border: #1a2a4a;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff00;
+    --text: #c8e0ff;
+    --dim: #4a6080;
+    --glow: 0 0 20px rgba(0,212,255,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  header {
+    text-align: center;
+    padding: 30px 0 20px;
+  }
+
+  header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    font-weight: 900;
+    color: var(--accent);
+    text-shadow: var(--glow);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  header p {
+    color: var(--dim);
+    margin-top: 8px;
+    font-size: 0.9rem;
+    font-style: italic;
+  }
+
+  /* Tab navigation */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin: 20px 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px 8px;
+    border: none;
+    background: transparent;
+    color: var(--dim);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.3s;
+    text-align: center;
+  }
+
+  .tab.active {
+    background: rgba(0,212,255,0.15);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px rgba(0,212,255,0.4);
+  }
+
+  .tab:hover:not(.active) {
+    color: var(--text);
+    background: rgba(255,255,255,0.04);
+  }
+
+  /* Section panels */
+  .section {
+    display: none;
+  }
+  .section.active {
+    display: block;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::before {
+    content: '';
+    width: 3px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 2px;
+    box-shadow: var(--glow);
+  }
+
+  /* SIMULATION TRACK */
+  .track-container {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .track {
+    position: relative;
+    height: 80px;
+    background: linear-gradient(180deg, rgba(0,212,255,0.03) 0%, rgba(0,212,255,0.08) 100%);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .track-road {
+    position: absolute;
+    bottom: 20px;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--dim);
+  }
+
+  .track-marks {
+    position: absolute;
+    bottom: 8px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 10px;
+    font-size: 0.65rem;
+    color: var(--dim);
+    font-family: 'Orbitron', monospace;
+  }
+
+  .car {
+    position: absolute;
+    bottom: 22px;
+    width: 50px;
+    height: 26px;
+    transition: none;
+  }
+
+  .car-body {
+    position: absolute;
+    bottom: 0;
+    left: 5px;
+    right: 5px;
+    height: 18px;
+    background: linear-gradient(135deg, var(--accent2), #ff4500);
+    border-radius: 4px 4px 2px 2px;
+    box-shadow: 0 0 15px rgba(255,107,53,0.5);
+  }
+
+  .car-top {
+    position: absolute;
+    bottom: 12px;
+    left: 14px;
+    right: 14px;
+    height: 10px;
+    background: rgba(0,212,255,0.3);
+    border-radius: 3px 3px 0 0;
+    border: 1px solid rgba(0,212,255,0.5);
+  }
+
+  .wheel {
+    position: absolute;
+    bottom: -5px;
+    width: 10px;
+    height: 10px;
+    background: #333;
+    border-radius: 50%;
+    border: 2px solid #666;
+  }
+  .wheel-f { right: 6px; }
+  .wheel-b { left: 6px; }
+
+  /* Controls */
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .control-group label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0,212,255,0.6);
+  }
+
+  .val-display {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    min-width: 55px;
+    text-align: right;
+  }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid var(--border);
+    background: rgba(0,212,255,0.08);
+    color: var(--accent);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    background: rgba(0,212,255,0.2);
+    box-shadow: var(--glow);
+  }
+
+  .btn.stop {
+    color: var(--accent2);
+    border-color: rgba(255,107,53,0.3);
+    background: rgba(255,107,53,0.08);
+  }
+  .btn.stop:hover {
+    background: rgba(255,107,53,0.2);
+  }
+
+  .btn.reset {
+    color: var(--dim);
+  }
+
+  /* Live stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .stat-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .stat-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .stat-unit {
+    font-size: 0.6rem;
+    color: var(--dim);
+    margin-top: 2px;
+  }
+
+  .sv-x { color: var(--accent); }
+  .sv-v { color: var(--accent3); }
+  .sv-a { color: var(--accent2); }
+
+  /* CANVAS for graphs */
+  canvas {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+    background: rgba(0,0,0,0.3);
+  }
+
+  .graph-wrap {
+    margin-bottom: 12px;
+  }
+
+  .graph-label {
+    font-size: 0.7rem;
+    color: var(--dim);
+    margin-bottom: 6px;
+    font-family: 'Orbitron', monospace;
+    letter-spacing: 1px;
+  }
+
+  /* THEORY section */
+  .theory-card {
+    background: rgba(0,0,0,0.3);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .theory-card h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .theory-card p {
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .formula-box {
+    background: rgba(0,212,255,0.06);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 10px 0;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem;
+    color: var(--accent);
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  .key-point {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 8px 0;
+    font-size: 0.82rem;
+  }
+
+  .key-point .dot {
+    min-width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 5px;
+    box-shadow: var(--glow);
+  }
+
+  /* TASKS section */
+  .task-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 14px;
+    transition: border-color 0.3s;
+  }
+
+  .task-card:hover {
+    border-color: rgba(0,212,255,0.3);
+  }
+
+  .task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .task-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    color: var(--accent2);
+    letter-spacing: 1px;
+  }
+
+  .difficulty {
+    font-size: 0.65rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  .easy { background: rgba(127,255,0,0.1); color: var(--accent3); border: 1px solid rgba(127,255,0,0.3); }
+  .med { background: rgba(255,212,0,0.1); color: #ffd400; border: 1px solid rgba(255,212,0,0.3); }
+  .hard { background: rgba(255,107,53,0.1); color: var(--accent2); border: 1px solid rgba(255,107,53,0.3); }
+
+  .task-text {
+    font-size: 0.85rem;
+    line-height: 1.7;
+    margin-bottom: 14px;
+  }
+
+  .task-questions {
+    font-size: 0.8rem;
+    color: var(--accent);
+  }
+
+  .task-questions li {
+    margin: 5px 0 5px 16px;
+    color: var(--text);
+  }
+
+  .answer-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 0.75rem;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: all 0.2s;
+  }
+
+  .answer-toggle:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .answer-box {
+    display: none;
+    margin-top: 12px;
+    background: rgba(0,212,255,0.04);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 0.8rem;
+    line-height: 1.8;
+  }
+
+  .answer-box.visible {
+    display: block;
+  }
+
+  .answer-box strong {
+    color: var(--accent3);
+  }
+
+  /* Mode indicator */
+  .mode-indicator {
+    text-align: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.7rem;
+    color: var(--accent2);
+    padding: 6px;
+    background: rgba(255,107,53,0.08);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* Progress bar for simulation */
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    border-radius: 2px;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 8px rgba(0,212,255,0.5);
+  }
+
+  .graph-legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: var(--dim);
+  }
+  .legend-dot {
+    width: 20px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>⚡ Механикалық қозғалыс</h1>
+    <p>Интерактивті симуляция және графиктер • Физика сабағы</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('sim')">🚗 Симуляция</button>
+    <button class="tab" onclick="showTab('theory')">📖 Теория</button>
+    <button class="tab" onclick="showTab('tasks')">✏️ Тапсырмалар</button>
+  </div>
+
+  <!-- SIMULATION -->
+  <div class="section active" id="tab-sim">
+
+    <div class="panel">
+      <div class="panel-title">Параметрлерді орнату</div>
+
+      <div id="modeIndicator" class="mode-indicator">🟢 БІРҚАЛЫПТЫ ҚОЗҒАЛЫС — үдеу = 0</div>
+
+      <div class="controls">
+        <div class="control-group">
+          <label>Бастапқы жылдамдық (v₀)</label>
+          <div class="slider-row">
+            <input type="range" id="v0Slider" min="0" max="20" value="5" step="0.5" oninput="updateParams()">
+            <span class="val-display sv-v" id="v0Val">5.0 м/с</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Үдеу (a)</label>
+          <div class="slider-row">
+            <input type="range" id="aSlider" min="-5" max="5" value="0" step="0.5" oninput="updateParams()">
+            <span class="val-display sv-a" id="aVal">0.0 м/с²</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Бастапқы координата (x₀)</label>
+          <div class="slider-row">
+            <input type="range" id="x0Slider" min="0" max="50" value="0" step="1" oninput="updateParams()">
+            <span class="val-display sv-x" id="x0Val">0 м</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>Симуляция уақыты</label>
+          <div class="slider-row">
+            <input type="range" id="tSlider" min="5" max="20" value="10" step="1" oninput="updateParams()">
+            <span class="val-display" id="tVal">10 с</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" onclick="startSim()">▶ ІСКЕ ҚОСУ</button>
+        <button class="btn stop" onclick="pauseSim()">⏸ ТОҚТАТУ</button>
+        <button class="btn reset" onclick="resetSim()">↺ ҚАЛПЫНА</button>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+
+      <div class="track-container">
+        <div class="track" id="track">
+          <div class="track-road"></div>
+          <div class="car" id="car">
+            <div class="car-top"></div>
+            <div class="car-body"></div>
+            <div class="wheel wheel-f"></div>
+            <div class="wheel wheel-b"></div>
+          </div>
+          <div class="track-marks">
+            <span id="m0">0</span>
+            <span id="m1"></span>
+            <span id="m2"></span>
+            <span id="m3"></span>
+            <span id="m4"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Координата x</div>
+          <div class="stat-value sv-x" id="statX">0.0</div>
+          <div class="stat-unit">метр</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Жылдамдық v</div>
+          <div class="stat-value sv-v" id="statV">5.0</div>
+          <div class="stat-unit">м/с</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Уақыт t</div>
+          <div class="stat-value" id="statT">0.0</div>
+          <div class="stat-unit">секунд</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graphs -->
+    <div class="panel">
+      <div class="panel-title">Графиктер</div>
+
+      <div class="graph-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#00d4ff"></div>x(t) — координата</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7fff00"></div>v(t) — жылдамдық</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff6b35"></div>a(t) — үдеу</div>
+      </div>
+
+      <div class="graph-wrap">
+        <div class="graph-label">x(t) — КООРДИНАТА ГРАФИГІ</div>
+        <canvas id="xGraph" height="140"></canvas>
+      </div>
+
+      <div class="graph-wrap">
+        <div class="graph-label">v(t) — ЖЫЛДАМДЫҚ ГРАФИГІ</div>
+        <canvas id="vGraph" height="120"></canvas>
+      </div>
+
+      <div class="graph-wrap">
+        <div class="graph-label">a(t) — ҮДЕУ ГРАФИГІ</div>
+        <canvas id="aGraph" height="80"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- THEORY -->
+  <div class="section" id="tab-theory">
+
+    <div class="panel">
+      <div class="panel-title">Теориялық негіздер</div>
+
+      <div class="theory-card">
+        <h3>📊 x(t) — Координата графигі</h3>
+        <p>Бұл график дененің <strong style="color:var(--accent)">қай жерде</strong> орналасқанын уақытқа қарай көрсетеді.</p>
+        <div class="key-point"><span class="dot"></span><span>Горизонталь түзу → дене тыныштықта (қозғалмайды)</span></div>
+        <div class="key-point"><span class="dot"></span><span>Көлбеу түзу → бірқалыпты қозғалыс (v = тұрақты)</span></div>
+        <div class="key-point"><span class="dot"></span><span>Парабола → үдемелі қозғалыс (a ≠ 0)</span></div>
+        <div class="key-point"><span class="dot"></span><span>Түзудің еңіс бұрышы = жылдамдық: <strong style="color:var(--accent)">v = Δx/Δt</strong></span></div>
+        <div class="formula-box">x = x₀ + v₀·t + a·t²/2</div>
+      </div>
+
+      <div class="theory-card" style="border-color:var(--accent3)">
+        <h3 style="color:var(--accent3)">📊 v(t) — Жылдамдық графигі</h3>
+        <p>Бұл график дененің <strong style="color:var(--accent3)">қаншалықты жылдам</strong> қозғалатынын көрсетеді.</p>
+        <div class="key-point"><span class="dot" style="background:var(--accent3)"></span><span>Горизонталь түзу → a = 0, бірқалыпты қозғалыс</span></div>
+        <div class="key-point"><span class="dot" style="background:var(--accent3)"></span><span>Жоғары қарай → оң үдеу (жылдамдайды)</span></div>
+        <div class="key-point"><span class="dot" style="background:var(--accent3)"></span><span>Төмен қарай → теріс үдеу (баяулайды)</span></div>
+        <div class="key-point"><span class="dot" style="background:var(--accent3)"></span><span>График астындағы аудан = орын ауыстыру (S)</span></div>
+        <div class="formula-box" style="border-color:rgba(127,255,0,0.3);color:var(--accent3)">v = v₀ + a·t</div>
+      </div>
+
+      <div class="theory-card" style="border-color:var(--accent2)">
+        <h3 style="color:var(--accent2)">📊 a(t) — Үдеу графигі</h3>
+        <p>Бұл график жылдамдықтың <strong style="color:var(--accent2)">қаншалықты өзгеретінін</strong> көрсетеді.</p>
+        <div class="key-point"><span class="dot" style="background:var(--accent2)"></span><span>a = 0 → бірқалыпты қозғалыс (v өзгермейді)</span></div>
+        <div class="key-point"><span class="dot" style="background:var(--accent2)"></span><span>a > 0 → жылдамдық өседі</span></div>
+        <div class="key-point"><span class="dot" style="background:var(--accent2)"></span><span>a &lt; 0 → жылдамдық кемиді (тежелу)</span></div>
+        <div class="key-point"><span class="dot" style="background:var(--accent2)"></span><span>Еңіс бұрышы = a: <strong style="color:var(--accent2)">a = Δv/Δt</strong></span></div>
+        <div class="formula-box" style="border-color:rgba(255,107,53,0.3);color:var(--accent2)">a = (v - v₀) / t</div>
+      </div>
+
+      <div class="panel" style="background:rgba(0,212,255,0.04)">
+        <div class="panel-title">Графиктер арасындағы байланыс</div>
+        <div style="font-size:0.82rem;line-height:1.9">
+          <p>🔗 <strong style="color:var(--accent)">x(t)</strong> графигінің еңісі → <strong style="color:var(--accent3)">v(t)</strong> мәнін береді</p>
+          <p>🔗 <strong style="color:var(--accent3)">v(t)</strong> графигінің еңісі → <strong style="color:var(--accent2)">a(t)</strong> мәнін береді</p>
+          <p>🔗 <strong style="color:var(--accent3)">v(t)</strong> астындағы аудан → орын ауыстыру <strong style="color:var(--accent)">S</strong></p>
+          <p>🔗 <strong style="color:var(--accent2)">a(t)</strong> астындағы аудан → жылдамдықтың өзгерісі <strong style="color:var(--accent3)">Δv</strong></p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TASKS -->
+  <div class="section" id="tab-tasks">
+
+    <div class="panel">
+      <div class="panel-title">Тапсырмалар</div>
+
+      <!-- Task 1 -->
+      <div class="task-card">
+        <div class="task-header">
+          <span class="task-num">ТАПСЫРМА №1</span>
+          <span class="difficulty easy">ОҢАЙ</span>
+        </div>
+        <div class="task-text">
+          Велосипедші тыныштықтан қозғала бастайды. <strong>8 секунд</strong> ішінде жылдамдығы <strong>16 м/с</strong>-қа жетеді.
+        </div>
+        <div class="task-questions">Табыңыз:
+          <li>Дененің үдеуін (a)</li>
+          <li>8 секундтағы өткен жолды (S)</li>
+          <li>v(t) графигін сипаттаңыз — қандай сызық болады?</li>
+        </div>
+        <button class="answer-toggle" onclick="toggleAnswer(this)">💡 Жауапты көру</button>
+        <div class="answer-box">
+          <strong>1) Үдеу:</strong> a = Δv/Δt = (16 - 0)/8 = <strong>2 м/с²</strong><br><br>
+          <strong>2) Жол (v(t) астындағы трапеция):</strong><br>
+          S = ½ · (v₀ + v) · t = ½ · (0 + 16) · 8 = <strong>64 метр</strong><br>
+          немесе: S = v₀t + ½at² = 0 + ½·2·64 = 64 м ✓<br><br>
+          <strong>3) v(t) графигі:</strong> (0;0) нүктесінен (8;16) нүктесіне дейін <strong>жоғары қарай кеткен түзу сызық</strong> болады (a > 0 себебі).
+        </div>
+      </div>
+
+      <!-- Task 2 -->
+      <div class="task-card">
+        <div class="task-header">
+          <span class="task-num">ТАПСЫРМА №2</span>
+          <span class="difficulty easy">ОҢАЙ</span>
+        </div>
+        <div class="task-text">
+          x(t) графигі бойынша: дене <strong>t = 0 с</strong>-та x = 20 м жерде, <strong>t = 5 с</strong>-та x = 20 м жерде тұр.
+        </div>
+        <div class="task-questions">Анықтаңыз:
+          <li>Дене қозғала ма?</li>
+          <li>Жылдамдықты есептеңіз</li>
+          <li>v(t) және a(t) графиктері қандай болады?</li>
+        </div>
+        <button class="answer-toggle" onclick="toggleAnswer(this)">💡 Жауапты көру</button>
+        <div class="answer-box">
+          <strong>1)</strong> x өзгермеген → дене <strong>қозғалмайды</strong> (тыныштықта)<br><br>
+          <strong>2) Жылдамдық:</strong> v = Δx/Δt = (20 - 20)/5 = <strong>0 м/с</strong><br><br>
+          <strong>3) Графиктер:</strong><br>
+          • x(t) — <strong>горизонталь түзу</strong> (x = 20 м деңгейінде)<br>
+          • v(t) — <strong>t-осімен сәйкес келетін горизонталь</strong> (v = 0)<br>
+          • a(t) — <strong>нөлдік</strong> (a = 0)
+        </div>
+      </div>
+
+      <!-- Task 3 -->
+      <div class="task-card">
+        <div class="task-header">
+          <span class="task-num">ТАПСЫРМА №3</span>
+          <span class="difficulty med">ОРТАША</span>
+        </div>
+        <div class="task-text">
+          Поезд <strong>v₀ = 30 м/с</strong> жылдамдықпен келеді де, <strong>a = -1.5 м/с²</strong> үдеумен тежеле бастайды.
+        </div>
+        <div class="task-questions">Есептеңіз:
+          <li>Поезд қанша секундта тоқтайды?</li>
+          <li>Тоқтағанға дейін қанша метр жүреді?</li>
+          <li>x(t) графигі қандай болады — түзу ме, парабола ма?</li>
+        </div>
+        <button class="answer-toggle" onclick="toggleAnswer(this)">💡 Жауапты көру</button>
+        <div class="answer-box">
+          <strong>1) Тоқтау уақыты:</strong><br>
+          v = v₀ + at → 0 = 30 + (-1.5)·t → t = 30/1.5 = <strong>20 секунд</strong><br><br>
+          <strong>2) Жол:</strong><br>
+          S = v₀t + ½at² = 30·20 + ½·(-1.5)·400 = 600 - 300 = <strong>300 метр</strong><br>
+          немесе: S = (v² - v₀²)/(2a) = (0 - 900)/(-3) = 300 м ✓<br><br>
+          <strong>3) x(t) графигі:</strong> <strong>Парабола</strong> — себебі a ≠ 0. Парабола жоғары қарай ашылмайды, максимумға жетіп тоқтайды (a теріс болғандықтан).
+        </div>
+      </div>
+
+      <!-- Task 4 -->
+      <div class="task-card">
+        <div class="task-header">
+          <span class="task-num">ТАПСЫРМА №4</span>
+          <span class="difficulty hard">ҚИЫН</span>
+        </div>
+        <div class="task-text">
+          Автомобиль 3 кезеңнен тұратын жол жүреді:<br>
+          • <strong>0–5 с:</strong> тыныштықтан 20 м/с-қа дейін үдейді<br>
+          • <strong>5–12 с:</strong> 20 м/с бірқалыпты жылдамдықпен жүреді<br>
+          • <strong>12–17 с:</strong> 20 м/с-тан тоқтап қалғанша тежеледі
+        </div>
+        <div class="task-questions">Есептеңіз:
+          <li>Әр кезеңдегі үдеуді</li>
+          <li>Әр кезеңдегі жолды және жалпы жолды</li>
+          <li>v(t) графигін толық сипаттаңыз</li>
+          <li>17 секундтағы координатаны (x₀ = 0 деп алыңыз)</li>
+        </div>
+        <button class="answer-toggle" onclick="toggleAnswer(this)">💡 Жауапты көру</button>
+        <div class="answer-box">
+          <strong>1) Үдеулер:</strong><br>
+          • a₁ = (20-0)/5 = <strong>+4 м/с²</strong><br>
+          • a₂ = 0/7 = <strong>0 м/с²</strong><br>
+          • a₃ = (0-20)/5 = <strong>-4 м/с²</strong><br><br>
+          <strong>2) Жолдар:</strong><br>
+          • S₁ = ½·20·5 = <strong>50 м</strong><br>
+          • S₂ = 20·7 = <strong>140 м</strong><br>
+          • S₃ = ½·20·5 = <strong>50 м</strong><br>
+          • S<sub>жалпы</sub> = 50+140+50 = <strong>240 метр</strong><br><br>
+          <strong>3) v(t) графигі:</strong> Трапеция тәрізді — алдымен жоғары (0→20), кейін горизонталь (20), соңында төмен (20→0).<br><br>
+          <strong>4) Координата:</strong> x = x₀ + S = 0 + 240 = <strong>240 м</strong>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===================== SIMULATION ENGINE =====================
+let animId = null;
+let running = false;
+let startTime = null;
+let simDuration = 10;
+let v0 = 5, a = 0, x0 = 0;
+let maxX = 100;
+
+// Data arrays for graphs
+let dataX = [], dataV = [], dataT = [];
+
+function updateParams() {
+  v0 = parseFloat(document.getElementById('v0Slider').value);
+  a = parseFloat(document.getElementById('aSlider').value);
+  x0 = parseFloat(document.getElementById('x0Slider').value);
+  simDuration = parseFloat(document.getElementById('tSlider').value);
+
+  document.getElementById('v0Val').textContent = v0.toFixed(1) + ' м/с';
+  document.getElementById('aVal').textContent = a.toFixed(1) + ' м/с²';
+  document.getElementById('x0Val').textContent = x0.toFixed(0) + ' м';
+  document.getElementById('tVal').textContent = simDuration.toFixed(0) + ' с';
+
+  // Update mode indicator
+  const ind = document.getElementById('modeIndicator');
+  if (Math.abs(a) < 0.01) {
+    ind.textContent = '🟢 БІРҚАЛЫПТЫ ҚОЗҒАЛЫС — үдеу = 0, v(t) горизонталь түзу';
+    ind.style.color = '#7fff00';
+    ind.style.background = 'rgba(127,255,0,0.08)';
+  } else if (a > 0) {
+    ind.textContent = '🟡 ҮДЕМЕЛІ ҚОЗҒАЛЫС — жылдамдық өседі, x(t) парабола';
+    ind.style.color = '#ffd400';
+    ind.style.background = 'rgba(255,212,0,0.08)';
+  } else {
+    ind.textContent = '🔴 ТЕЖЕЛУ — жылдамдық кемиді, a < 0';
+    ind.style.color = '#ff6b35';
+    ind.style.background = 'rgba(255,107,53,0.08)';
+  }
+
+  // Precompute max x for track marks
+  computeMaxX();
+  updateTrackMarks();
+
+  if (!running) {
+    updateDisplay(0);
+    drawGraphs([],[],[]);
+  }
+}
+
+function computeMaxX() {
+  let tStop = simDuration;
+  if (a < 0 && v0 > 0) {
+    let tZero = -v0/a;
+    if (tZero < simDuration) tStop = tZero;
+  }
+  let xMax = x0 + v0*tStop + 0.5*a*tStop*tStop;
+  let xMin = x0;
+  // also check t=0
+  maxX = Math.max(Math.abs(xMax), Math.abs(xMin), x0+1) * 1.15;
+  maxX = Math.max(maxX, 20);
+}
+
+function updateTrackMarks() {
+  const step = Math.round(maxX/4);
+  for (let i=0;i<5;i++) {
+    const el = document.getElementById('m'+i);
+    if(el) el.textContent = (step*i) + ' м';
+  }
+}
+
+function xToPercent(x) {
+  return Math.max(0, Math.min(95, (x / maxX) * 95));
+}
+
+function calcX(t) { return x0 + v0*t + 0.5*a*t*t; }
+function calcV(t) { return v0 + a*t; }
+
+function updateDisplay(t) {
+  const cx = calcX(t);
+  const cv = calcV(t);
+
+  document.getElementById('statX').textContent = cx.toFixed(1);
+  document.getElementById('statV').textContent = cv.toFixed(2);
+  document.getElementById('statT').textContent = t.toFixed(1);
+
+  const pct = xToPercent(cx);
+  document.getElementById('car').style.left = pct + '%';
+
+  const progress = Math.min(100, (t/simDuration)*100);
+  document.getElementById('progressFill').style.width = progress + '%';
+}
+
+function startSim() {
+  if (running) return;
+  resetData();
+  running = true;
+  startTime = performance.now();
+  animate();
+}
+
+function resetData() {
+  dataX = []; dataV = []; dataT = [];
+}
+
+function animate() {
+  if (!running) return;
+  const elapsed = (performance.now() - startTime) / 1000;
+  const t = Math.min(elapsed, simDuration);
+
+  let cv = calcV(t);
+  // Stop if velocity hits 0 when decelerating
+  let actualT = t;
+  if (a < 0 && cv <= 0) {
+    actualT = -v0/a;
+    running = false;
+  }
+
+  const cx = calcX(actualT);
+  const acv = v0 + a*actualT;
+
+  dataT.push(actualT);
+  dataX.push(cx);
+  dataV.push(acv);
+
+  updateDisplay(actualT);
+  drawGraphs(dataT, dataX, dataV);
+
+  if (t >= simDuration || !running) {
+    running = false;
+    return;
+  }
+
+  animId = requestAnimationFrame(animate);
+}
+
+function pauseSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+}
+
+function resetSim() {
+  pauseSim();
+  resetData();
+  updateDisplay(0);
+  drawGraphs([],[],[]);
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('car').style.left = xToPercent(x0) + '%';
+}
+
+// ===================== GRAPH DRAWING =====================
+function drawGraphs(ts, xs, vs) {
+  drawXGraph(ts, xs);
+  drawVGraph(ts, vs);
+  drawAGraph(ts);
+}
+
+function initCanvas(id) {
+  const canvas = document.getElementById(id);
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = Math.floor(rect.width) || 600;
+  return { canvas, ctx: canvas.getContext('2d'), W: canvas.width, H: canvas.height };
+}
+
+function drawAxes(ctx, W, H, pad, color='#1a2a4a') {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  // Grid
+  ctx.strokeStyle = 'rgba(26,42,74,0.5)';
+  for (let i=1;i<4;i++) {
+    ctx.beginPath();
+    ctx.moveTo(pad, pad + (H-2*pad)*i/4);
+    ctx.lineTo(W-pad, pad + (H-2*pad)*i/4);
+    ctx.stroke();
+  }
+  // Axes
+  ctx.strokeStyle = '#2a3a5a';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(pad, pad); ctx.lineTo(pad, H-pad);
+  ctx.moveTo(pad, H-pad); ctx.lineTo(W-pad, H-pad);
+  ctx.stroke();
+}
+
+function drawXGraph(ts, xs) {
+  const {canvas,ctx,W,H} = initCanvas('xGraph');
+  ctx.clearRect(0,0,W,H);
+  const pad = 36;
+
+  drawAxes(ctx, W, H, pad);
+
+  // Labels
+  ctx.fillStyle = '#4a6080';
+  ctx.font = '10px Orbitron';
+  ctx.fillText('x(м)', 2, pad-4);
+  ctx.fillText('t(с)', W-pad+4, H-pad+4);
+
+  if (ts.length < 2) {
+    // Draw preview curve
+    const steps = 60;
+    ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    const xVals = [], tVals = [];
+    for(let i=0;i<=steps;i++) {
+      const t = (i/steps)*simDuration;
+      let cv = v0+a*t;
+      if(a<0 && cv<0) break;
+      tVals.push(t); xVals.push(calcX(t));
+    }
+    if(tVals.length>0) {
+      const xMin2 = Math.min(...xVals), xMax2 = Math.max(...xVals);
+      const xRange = xMax2 - xMin2 || 1;
+      for(let i=0;i<tVals.length;i++) {
+        const px = pad + (tVals[i]/simDuration)*(W-2*pad);
+        const py = H-pad - ((xVals[i]-xMin2)/xRange)*(H-2*pad)*0.85 - (H-2*pad)*0.05;
+        i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    return;
+  }
+
+  const xMin = Math.min(...xs), xMax2 = Math.max(...xs);
+  const xRange = xMax2 - xMin || 1;
+  const tMax = ts[ts.length-1];
+
+  // Y axis labels
+  ctx.fillStyle = '#4a6080';
+  ctx.font = '9px Exo 2';
+  ctx.fillText(xMax2.toFixed(0), 2, pad+4);
+  ctx.fillText(xMin.toFixed(0), 2, H-pad-2);
+
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = '#00d4ff';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  for (let i=0;i<ts.length;i++) {
+    const px = pad + (ts[i]/simDuration)*(W-2*pad);
+    const py = H-pad - ((xs[i]-xMin)/xRange)*(H-2*pad)*0.85 - (H-2*pad)*0.05;
+    i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawVGraph(ts, vs) {
+  const {canvas,ctx,W,H} = initCanvas('vGraph');
+  ctx.clearRect(0,0,W,H);
+  const pad = 36;
+
+  drawAxes(ctx, W, H, pad);
+
+  ctx.fillStyle = '#4a6080';
+  ctx.font = '10px Orbitron';
+  ctx.fillText('v(м/с)', 2, pad-4);
+  ctx.fillText('t(с)', W-pad+4, H-pad+4);
+
+  // Preview
+  if (ts.length < 2) {
+    const steps = 60;
+    ctx.strokeStyle = 'rgba(127,255,0,0.3)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4,4]);
+    const vVals = [], tVals = [];
+    for(let i=0;i<=steps;i++) {
+      const t = (i/steps)*simDuration;
+      const cv = v0+a*t;
+      if(a<0 && cv<0) break;
+      tVals.push(t); vVals.push(cv);
+    }
+    const vMin2 = Math.min(...vVals,0), vMax2 = Math.max(...vVals,0.1);
+    const vRange = vMax2-vMin2||1;
+    ctx.beginPath();
+    for(let i=0;i<tVals.length;i++) {
+      const px = pad + (tVals[i]/simDuration)*(W-2*pad);
+      const py = H-pad - ((vVals[i]-vMin2)/vRange)*(H-2*pad)*0.85 - (H-2*pad)*0.05;
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
+
+  const vMin = Math.min(...vs, 0), vMax2 = Math.max(...vs, 0.1);
+  const vRange = vMax2-vMin||1;
+
+  // Shade area under curve
+  ctx.fillStyle = 'rgba(127,255,0,0.07)';
+  ctx.beginPath();
+  const zeroY = H-pad - ((0-vMin)/vRange)*(H-2*pad)*0.85 - (H-2*pad)*0.05;
+  ctx.moveTo(pad, zeroY);
+  for(let i=0;i<ts.length;i++) {
+    const px = pad + (ts[i]/simDuration)*(W-2*pad);
+    const py = H-pad - ((vs[i]-vMin)/vRange)*(H-2*pad)*0.85 - (H-2*pad)*0.05;
+    ctx.lineTo(px,py);
+  }
+  const lastPx = pad + (ts[ts.length-1]/simDuration)*(W-2*pad);
+  ctx.lineTo(lastPx, zeroY);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = '#7fff00';
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = '#7fff00';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  for(let i=0;i<ts.length;i++) {
+    const px = pad + (ts[i]/simDuration)*(W-2*pad);
+    const py = H-pad - ((vs[i]-vMin)/vRange)*(H-2*pad)*0.85 - (H-2*pad)*0.05;
+    i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Axis labels
+  ctx.fillStyle = '#4a6080';
+  ctx.font = '9px Exo 2';
+  ctx.fillText(vMax2.toFixed(1), 2, pad+4);
+  ctx.fillText('0', 2, zeroY+4);
+}
+
+function drawAGraph(ts) {
+  const {canvas,ctx,W,H} = initCanvas('aGraph');
+  ctx.clearRect(0,0,W,H);
+  const pad = 36;
+
+  drawAxes(ctx, W, H, pad);
+
+  ctx.fillStyle = '#4a6080';
+  ctx.font = '10px Orbitron';
+  ctx.fillText('a(м/с²)', 2, pad-4);
+
+  const midY = H/2;
+
+  // Zero line
+  ctx.strokeStyle = 'rgba(74,96,128,0.5)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath();
+  ctx.moveTo(pad, midY); ctx.lineTo(W-pad, midY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // a value line
+  const aY = midY - (a/10) * (H/2-pad-4);
+
+  ctx.strokeStyle = '#ff6b35';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = '#ff6b35';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(pad, aY);
+  if (ts.length > 1) {
+    ctx.lineTo(pad + (ts[ts.length-1]/simDuration)*(W-2*pad), aY);
+  } else {
+    ctx.lineTo(W-pad, aY);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = '#ff6b35';
+  ctx.font = '10px Orbitron';
+  ctx.fillText('a = ' + a.toFixed(1), W-pad-60, aY-6);
+
+  ctx.fillStyle = '#4a6080';
+  ctx.font = '9px Exo 2';
+  ctx.fillText('0', pad-16, midY+4);
+  ctx.fillText(a.toFixed(1), 2, aY+4);
+}
+
+// ===================== TABS =====================
+function showTab(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.target.classList.add('active');
+
+  if (id === 'sim') {
+    setTimeout(() => { updateParams(); }, 50);
+  }
+}
+
+function toggleAnswer(btn) {
+  const box = btn.nextElementSibling;
+  box.classList.toggle('visible');
+  btn.textContent = box.classList.contains('visible') ? '🙈 Жасыру' : '💡 Жауапты көру';
+}
+
+// Init
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    updateParams();
+    drawGraphs([],[],[]);
+  }, 100);
+});
+
+window.addEventListener('resize', () => {
+  if (!running) drawGraphs(dataT, dataX, dataV);
+});
+</script>
+</body>
+</html>
